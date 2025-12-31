@@ -117,11 +117,11 @@ class MediaListStatus(AniListBaseEnum):
 
     __priority: ClassVar[dict[str, int]] = {
         "PLANNING": 1,
-        "CURRENT": 2,
-        "PAUSED": 2,
         "DROPPED": 2,
-        "COMPLETED": 3,
-        "REPEATING": 3,
+        "PAUSED": 3,
+        "CURRENT": 4,
+        "COMPLETED": 5,
+        "REPEATING": 5,
     }
 
     def __eq__(self, other: object) -> bool:

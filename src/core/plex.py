@@ -11,6 +11,7 @@ from xml.etree import ElementTree
 import plexapi.utils
 from async_lru import alru_cache
 from cachetools.func import ttl_cache
+from plexapi.exceptions import NotFound
 from plexapi.library import LibrarySection, MovieSection, ShowSection
 from plexapi.myplex import MyPlexUser
 from plexapi.server import PlexServer
@@ -573,7 +574,14 @@ class PlexClient:
         Returns:
             bool: True if item is on watchlist, False otherwise
         """
-        return bool(item.onWatchlist()) if self.is_admin_user else False
+        if not self.is_admin_user:
+            return False
+        try:
+            return bool(item.onWatchlist())
+        except NotFound:
+            # HAMA and other legacy agents may have GUIDs that Plex's
+            # metadata API doesn't recognize, causing 404 errors
+            return False
 
     def is_on_continue_watching(self, item: Movie | Show) -> bool:
         """Checks if a media item appears in the Continue Watching hub.

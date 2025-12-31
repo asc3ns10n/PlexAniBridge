@@ -36,62 +36,123 @@ _LEGACY_GUID_MAPPING = {
     "com.plexapp.agents.tmdb": "tmdb",
     "com.plexapp.agents.themoviedb": "tmdb",
     "com.plexapp.agents.thetvdb": "tvdb",
+    "com.plexapp.agents.hama": "hama",  # HAMA uses format: anidb-14482, tvdb-12345, etc.
+}
+
+# HAMA agent uses service-id format in the ID part (e.g., anidb-14482, tvdb-12345)
+_HAMA_SERVICE_MAPPING = {
+    "anidb": "anidb",
+    "tvdb": "tvdb",
+    "tvdb2": "tvdb",
+    "tvdb3": "tvdb",
+    "tvdb4": "tvdb",
+    "tvdb5": "tvdb",
+    "tmdb": "tmdb",
+    "imdb": "imdb",
 }
 
 
 class ParsedGuids(BaseModel):
     """Container for parsed media identifiers from different services.
 
-    Handles parsing and storage of media IDs from various services (TVDB, TMDB, IMDB)
-    from Plex's GUID format into a structured format. Provides iteration and string
-    representation for debugging.
+    Handles parsing and storage of media IDs from various services (TVDB, TMDB, IMDB,
+    AniDB) from Plex's GUID format into a structured format. Provides iteration and
+    string representation for debugging.
+
+    Attributes:
+        tvdb_absolute: True if using tvdb3/tvdb4/tvdb5 (absolute episode numbering)
 
     Note:
         GUID formats expected from Plex:
         - TVDB: "tvdb://123456" OR "com.plexapp.agents.thetvdb://123456"
         - TMDB: "tmdb://123456" OR "com.plexapp.agents.tmdb://123456" OR "com.plexapp.agents.themoviedb://123456"
         - IMDB: "imdb://tt1234567" OR "com.plexapp.agents.imdb://tt1234567"
+        - HAMA: "com.plexapp.agents.hama://anidb-14482?lang=en" (uses service-id format)
     """
 
     tvdb: int | None = None
     tmdb: int | None = None
     imdb: str | None = None
+    anidb: int | None = None
+    tvdb_absolute: bool = False  # True for tvdb3/tvdb4/tvdb5 (absolute episode numbering)
 
     @staticmethod
-    def from_guids(guids: list[Guid]) -> ParsedGuids:
+    def _parse_guid_string(guid_str: str, parsed_guids: "ParsedGuids") -> None:
+        """Parses a single GUID string and updates the ParsedGuids instance.
+
+        Args:
+            guid_str (str): GUID string to parse (e.g., "com.plexapp.agents.hama://anidb-14482?lang=en")
+            parsed_guids (ParsedGuids): Instance to update with parsed values
+        """
+        split_guid = guid_str.split("://")
+        if len(split_guid) != 2:
+            return
+
+        service = split_guid[0]
+        id_part = split_guid[1]
+
+        # Remove query parameters if present (e.g., ?lang=en)
+        if "?" in id_part:
+            id_part = id_part.split("?")[0]
+
+        # Remove trailing path segments (e.g., /1 for season numbers)
+        if "/" in id_part:
+            id_part = id_part.split("/")[0]
+
+        attr = _LEGACY_GUID_MAPPING.get(service, service)
+
+        # Handle HAMA agent's special format: service-id (e.g., anidb-14482)
+        if attr == "hama":
+            hama_parts = id_part.split("-", 1)
+            if len(hama_parts) == 2:
+                hama_service, hama_id = hama_parts
+                hama_service_lower = hama_service.lower()
+                # Detect absolute episode numbering (tvdb3, tvdb4, tvdb5)
+                if hama_service_lower in ("tvdb3", "tvdb4", "tvdb5"):
+                    parsed_guids.tvdb_absolute = True
+                attr = _HAMA_SERVICE_MAPPING.get(hama_service_lower)
+                if attr:
+                    id_part = hama_id
+                else:
+                    return
+            else:
+                return
+
+        if not hasattr(parsed_guids, attr):
+            return
+
+        # Only set if not already set (preserve first value found)
+        if getattr(parsed_guids, attr) is not None:
+            return
+
+        try:
+            setattr(parsed_guids, attr, int(id_part))
+        except ValueError:
+            setattr(parsed_guids, attr, str(id_part))
+
+    @staticmethod
+    def from_guids(guids: list[Guid], primary_guid: str | None = None) -> ParsedGuids:
         """Creates a ParsedGuids instance from a list of Plex GUIDs.
 
         Args:
             guids (list[Guid]): List of Plex GUID objects
+            primary_guid (str | None): Optional primary GUID string (item.guid) for
+                                       legacy agents like HAMA that store IDs there
 
         Returns:
             ParsedGuids: New instance with parsed IDs
         """
         parsed_guids = ParsedGuids()
 
+        # Parse the primary guid first (for legacy agents like HAMA)
+        if primary_guid:
+            ParsedGuids._parse_guid_string(primary_guid, parsed_guids)
+
+        # Then parse the guids list (modern Plex agents)
         for guid in guids:
             if not guid.id:
                 continue
-
-            split_guid = guid.id.split("://")
-            if len(split_guid) != 2:
-                continue
-
-            service = split_guid[0]
-            id_part = split_guid[1]
-
-            # Remove query parameters if present (e.g., ?lang=en)
-            if "?" in id_part:
-                id_part = id_part.split("?")[0]
-
-            attr = _LEGACY_GUID_MAPPING.get(service, service)
-            if not hasattr(parsed_guids, attr):
-                continue
-
-            try:
-                setattr(parsed_guids, attr, int(id_part))
-            except ValueError:
-                setattr(parsed_guids, attr, str(id_part))
+            ParsedGuids._parse_guid_string(guid.id, parsed_guids)
 
         return parsed_guids
 
@@ -339,7 +400,7 @@ class BaseSyncClient[
         Args:
             item (T): Grandparent Plex media item to sync.
         """
-        guids = ParsedGuids.from_guids(item.guids)
+        guids = ParsedGuids.from_guids(item.guids, item.guid)
 
         debug_log_title = self._debug_log_title(item=item)
         debug_log_ids = self._debug_log_ids(
@@ -525,7 +586,7 @@ class BaseSyncClient[
         Returns:
             SyncOutcome: The result of the synchronization operation.
         """
-        guids = ParsedGuids.from_guids(item.guids)
+        guids = ParsedGuids.from_guids(item.guids, item.guid)
 
         debug_log_title = self._debug_log_title(item=item, animapping=animapping)
         debug_log_ids = self._debug_log_ids(

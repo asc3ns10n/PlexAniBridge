@@ -40,14 +40,18 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
                 - AniMap: AniMap entry with ID mappings.
                 - Media: Matched AniList media entry.
         """
-        guids = ParsedGuids.from_guids(item.guids)
+        guids = ParsedGuids.from_guids(item.guids, item.guid)
 
         animapping: AniMap = next(
             self.animap_client.get_mappings(
-                imdb=guids.imdb, tmdb=guids.tmdb, tvdb=guids.tvdb, is_movie=True
+                imdb=guids.imdb,
+                tmdb=guids.tmdb,
+                tvdb=guids.tvdb,
+                anidb=guids.anidb,
+                is_movie=True,
             ),
             AniMap(
-                anidb_id=None,
+                anidb_id=guids.anidb,
                 anilist_id=0,
                 imdb_id=[guids.imdb] if guids.imdb else None,
                 tmdb_movie_id=[guids.tmdb] if guids.tmdb else None,

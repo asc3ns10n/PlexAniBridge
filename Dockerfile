@@ -39,13 +39,13 @@ FROM python:3.13-alpine
 
 RUN apk add --no-cache shadow su-exec
 
-LABEL maintainer="Elias Benbourenane <eliasbenbourenane@gmail.com>" \
+LABEL maintainer="asc3ns10n" \
     org.opencontainers.image.title="PlexAniBridge" \
-    org.opencontainers.image.description="The smart way to keep your AniList profile perfectly synchronized with your Plex library." \
-    org.opencontainers.image.authors="Elias Benbourenane <eliasbenbourenane@gmail.com>" \
-    org.opencontainers.image.url="https://plexanibridge.elias.eu.org" \
+    org.opencontainers.image.description="The smart way to keep your AniList profile perfectly synchronized with your Plex library. Fork with HAMA agent support." \
+    org.opencontainers.image.authors="asc3ns10n (fork), Elias Benbourenane (original)" \
+    org.opencontainers.image.url="https://github.com/asc3ns10n/PlexAniBridge" \
     org.opencontainers.image.documentation="https://plexanibridge.elias.eu.org" \
-    org.opencontainers.image.source="https://github.com/eliasbenb/PlexAniBridge" \
+    org.opencontainers.image.source="https://github.com/asc3ns10n/PlexAniBridge" \
     org.opencontainers.image.licenses="MIT"
 
 ENV PYTHONPATH=/opt/venv/lib/python3.13/site-packages \

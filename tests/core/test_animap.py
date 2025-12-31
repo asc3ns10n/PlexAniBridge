@@ -214,6 +214,58 @@ def test_get_mappings_returns_empty_when_no_identifiers(
     assert list(animap_client.get_mappings()) == []
 
 
+def test_get_mappings_filters_by_anidb_id(
+    animap_client: AniMapClient, tmp_path: Path, in_memory_db: PlexAniBridgeDB
+):
+    """Test that get_mappings filters AniMap rows by anidb_id (HAMA agent support)."""
+    mapping_data = {
+        "100": {
+            "anidb_id": 14482,
+            "tvdb_id": 12345,
+            "tvdb_mappings": {"s1": ""},
+        },
+        "200": {
+            "anidb_id": 99999,
+            "imdb_id": "tt12345",
+        },
+        "300": {
+            "tvdb_id": 67890,
+        },
+    }
+
+    (tmp_path / "mappings.custom.json").write_text(
+        json.dumps(mapping_data),
+        encoding="utf-8",
+    )
+
+    asyncio.run(animap_client.sync_db())
+
+    # Test anidb lookup for shows
+    anidb_show_matches = list(
+        animap_client.get_mappings(anidb=14482, is_movie=False)
+    )
+    assert {row.anilist_id for row in anidb_show_matches} == {100}
+    assert anidb_show_matches[0].anidb_id == 14482
+
+    # Test anidb lookup for movies
+    anidb_movie_matches = list(
+        animap_client.get_mappings(anidb=99999, is_movie=True)
+    )
+    assert {row.anilist_id for row in anidb_movie_matches} == {200}
+
+    # Test that non-anidb entries are not returned when querying by anidb
+    no_anidb_matches = list(
+        animap_client.get_mappings(anidb=67890, is_movie=False)
+    )
+    assert no_anidb_matches == []
+
+    # Test combined anidb and tvdb lookup
+    combined_matches = list(
+        animap_client.get_mappings(anidb=14482, tvdb=67890, is_movie=False)
+    )
+    assert {row.anilist_id for row in combined_matches} == {100, 300}
+
+
 def test_sync_db_filters_invalid_entries(
     animap_client: AniMapClient, in_memory_db: PlexAniBridgeDB
 ):

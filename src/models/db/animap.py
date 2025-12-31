@@ -154,7 +154,7 @@ class AniMap(Base):
 
     anilist_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     anidb_id: Mapped[int | None] = mapped_column(
-        Integer, index=False, nullable=True, default=None
+        Integer, index=True, nullable=True, default=None
     )
     imdb_id: Mapped[list[str] | None] = mapped_column(
         JSON, index=True, nullable=True, default=None

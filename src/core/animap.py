@@ -339,6 +339,7 @@ class AniMapClient:
         imdb: str | list[str] | None = None,
         tmdb: int | list[int] | None = None,
         tvdb: int | list[int] | None = None,
+        anidb: int | list[int] | None = None,
         is_movie: bool = True,
     ) -> Iterator[AniMap]:
         """Retrieve anime ID mappings based on provided criteria.
@@ -352,7 +353,7 @@ class AniMapClient:
             imdb: IMDB ID(s) to match. Can be partial match within array.
             tmdb: TMDB ID(s) to match for movies and TV shows.
             tvdb: TVDB ID(s) to match for TV shows only.
-            season: TVDB season number for exact matching on TV shows only.
+            anidb: AniDB ID(s) to match (used by HAMA agent).
             is_movie: Whether the search is for a movie or TV show.
 
         Yields:
@@ -360,10 +361,10 @@ class AniMapClient:
         """
         log.debug(
             f"Querying mappings with imdb={imdb}, "
-            f"tmdb={tmdb}, tvdb={tvdb}, is_movie={is_movie}"
+            f"tmdb={tmdb}, tvdb={tvdb}, anidb={anidb}, is_movie={is_movie}"
         )
 
-        if not imdb and not tmdb and not tvdb:
+        if not imdb and not tmdb and not tvdb and not anidb:
             return iter([])
 
         imdb_list = (
@@ -374,6 +375,11 @@ class AniMapClient:
         )
         tvdb_list = (
             [tvdb] if isinstance(tvdb, int) else tvdb if isinstance(tvdb, list) else []
+        )
+        anidb_list = (
+            [anidb]
+            if isinstance(anidb, int)
+            else anidb if isinstance(anidb, list) else []
         )
 
         with db() as ctx:
@@ -387,6 +393,11 @@ class AniMapClient:
                     or_conditions.append(
                         json_array_contains(AniMap.tmdb_movie_id, tmdb_list)
                     )
+                if anidb_list:
+                    if len(anidb_list) == 1:
+                        or_conditions.append(AniMap.anidb_id == anidb_list[0])
+                    else:
+                        or_conditions.append(AniMap.anidb_id.in_(anidb_list))
             else:
                 if imdb_list:
                     or_conditions.append(json_array_contains(AniMap.imdb_id, imdb_list))
@@ -400,6 +411,11 @@ class AniMapClient:
                         or_conditions.append(AniMap.tvdb_id == tvdb_list[0])
                     else:
                         or_conditions.append(AniMap.tvdb_id.in_(tvdb_list))
+                if anidb_list:
+                    if len(anidb_list) == 1:
+                        or_conditions.append(AniMap.anidb_id == anidb_list[0])
+                    else:
+                        or_conditions.append(AniMap.anidb_id.in_(anidb_list))
 
             merged_conditions: list[ColumnElement[bool]] = []
             if or_conditions:

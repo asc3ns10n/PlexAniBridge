@@ -345,14 +345,21 @@ class BridgeClient:
             )
 
         if self.profile_config.batch_requests:
-            parsed_guids = [ParsedGuids.from_guids(item.guids) for item in items]
+            parsed_guids = [
+                ParsedGuids.from_guids(item.guids, item.guid) for item in items
+            ]
             imdb_ids = [guid.imdb for guid in parsed_guids if guid.imdb is not None]
             tmdb_ids = [guid.tmdb for guid in parsed_guids if guid.tmdb is not None]
             tvdb_ids = [guid.tvdb for guid in parsed_guids if guid.tvdb is not None]
+            anidb_ids = [guid.anidb for guid in parsed_guids if guid.anidb is not None]
 
             animappings = list(
                 self.animap_client.get_mappings(
-                    imdb_ids, tmdb_ids, tvdb_ids, is_movie=section.type != "show"
+                    imdb_ids,
+                    tmdb_ids,
+                    tvdb_ids,
+                    anidb_ids,
+                    is_movie=section.type != "show",
                 )
             )
             anilist_ids = [
